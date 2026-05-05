@@ -21,6 +21,14 @@ export interface PendingUser {
   created_at: string;
 }
 
+export interface TutorialProgress {
+  tutorial_key: string;
+  status: "completed" | "skipped";
+  completed_at: string | null;
+  skipped_at: string | null;
+  updated_at?: string;
+}
+
 async function requestJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, withCsrfHeaders({ credentials: "include", ...init }));
   const raw = await response.text();
@@ -74,6 +82,21 @@ export async function updateProfile(payload: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchTutorialProgress(): Promise<{ ok: boolean; progress: TutorialProgress[] }> {
+  return requestJson("/api/tutorial-progress.php");
+}
+
+export async function saveTutorialProgress(
+  tutorialKey: string,
+  status: TutorialProgress["status"]
+): Promise<{ ok: boolean; progress: TutorialProgress }> {
+  return requestJson("/api/tutorial-progress.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tutorial_key: tutorialKey, status }),
   });
 }
 

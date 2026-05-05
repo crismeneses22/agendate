@@ -73,6 +73,19 @@ function ensure_runtime_schema(PDO $pdo) {
     try { $pdo->exec("ALTER TABLE users ADD COLUMN booking_cover_url VARCHAR(500) NULL AFTER booking_background"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE users ADD COLUMN public_slug_changes TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER public_slug"); } catch (Exception $e) {}
     try { $pdo->exec("ALTER TABLE services ADD COLUMN image_url VARCHAR(500) NULL AFTER color"); } catch (Exception $e) {}
+    try { $pdo->exec("CREATE TABLE IF NOT EXISTS user_tutorial_progress (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id INT UNSIGNED NOT NULL,
+        tutorial_key VARCHAR(80) NOT NULL,
+        status ENUM('completed','skipped') NOT NULL,
+        completed_at DATETIME NULL,
+        skipped_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_user_tutorial (user_id, tutorial_key),
+        INDEX idx_tutorial_user_status (user_id, status),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB"); } catch (Exception $e) {}
     try { $pdo->exec("CREATE INDEX idx_users_status_role ON users (status, role)"); } catch (Exception $e) {}
     try { $pdo->exec("CREATE INDEX idx_users_email_token ON users (email_token)"); } catch (Exception $e) {}
     try { $pdo->exec("CREATE UNIQUE INDEX uq_users_public_slug ON users (public_slug)"); } catch (Exception $e) {}

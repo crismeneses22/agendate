@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import type { AppointmentStatus } from "@/lib/appointments-api";
+import { GuidedTutorial } from "@/components/GuidedTutorial";
 
 // ─── Dark status badge ────────────────────────────────────────────────────────
 const BADGE: Record<AppointmentStatus, string> = {
@@ -122,6 +123,7 @@ export function AppShell({
       <main className={`${containerClass} mx-auto px-4 py-6`}>
         {children}
       </main>
+      <GuidedTutorial user={user} />
     </div>
   );
 }
