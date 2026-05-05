@@ -1,0 +1,12 @@
+Options -Indexes
+
+Require all denied
+
+<FilesMatch "\.(jpe?g|png|webp|gif)$">
+  Require all granted
+</FilesMatch>
+
+<FilesMatch "\.(php|phtml|phar|cgi|pl)$">
+  Require all denied
+  Deny from all
+</FilesMatch>

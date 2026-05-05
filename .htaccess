@@ -1,0 +1,28 @@
+Options -Indexes
+
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "DENY"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+</IfModule>
+
+<FilesMatch "^(\.env|\.env\..*|\.git.*|CLAUDE\.md|README\.md|package(-lock)?\.json|tsconfig.*\.json|vite\.config\..*|eslint\.config\..*)$">
+  Require all denied
+  Deny from all
+</FilesMatch>
+
+<FilesMatch "\.(sql|log|md|lock|ts|tsx|map|conf|ini|sh)$">
+  Require all denied
+  Deny from all
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(database|deployment|node_modules|src|storage|\.claude|\.git)(/|$) - [F,L]
+  RewriteCond %{REQUEST_URI} !^/api/
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>
