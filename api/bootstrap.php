@@ -28,9 +28,34 @@ function env_bool($key, $default = false) {
     return in_array($value, array('1', 'true', 'yes', 'on'), true);
 }
 
+function env_int($key, $default = 0) {
+    if (!isset($_ENV[$key])) return $default;
+    $value = (int)trim($_ENV[$key]);
+    return $value > 0 ? $value : $default;
+}
+
 function is_production() {
     $env = strtolower(isset($_ENV['AGENDATE_ENV']) ? $_ENV['AGENDATE_ENV'] : 'local');
     return in_array($env, array('production', 'prod'), true);
+}
+
+function session_idle_timeout_seconds() {
+    return env_int('AGENDATE_SESSION_IDLE_MINUTES', 30) * 60;
+}
+
+function destroy_current_session() {
+    session_unset();
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
+    session_destroy();
+}
+
+function is_logout_request() {
+    $script = isset($_SERVER['SCRIPT_NAME']) ? basename($_SERVER['SCRIPT_NAME']) : '';
+    $uriPath = isset($_SERVER['REQUEST_URI']) ? parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) : '';
+    return $script === 'logout.php' || basename((string)$uriPath) === 'logout.php';
 }
 
 function register_api_error_handlers() {
@@ -169,6 +194,7 @@ function boot_api() {
     ini_set('session.use_only_cookies', '1');
     ini_set('session.use_strict_mode', '1');
     ini_set('session.cookie_httponly', '1');
+    ini_set('session.gc_maxlifetime', (string)session_idle_timeout_seconds());
     if ($secure) ini_set('session.cookie_secure', '1');
     session_name('AGENDATESESSID');
     session_set_cookie_params(0, '/; SameSite=Lax', '', $secure, true);
@@ -180,7 +206,7 @@ function boot_api() {
 
     enforce_origin_for_state_change();
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !is_logout_request()) {
         $clientToken = isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : '';
         if (!hash_equals($_SESSION['csrf_token'], $clientToken)) {
             json_response(array('ok' => false, 'message' => 'CSRF token inválido.'), 403);
@@ -192,6 +218,18 @@ function require_session_user() {
     if (empty($_SESSION['user_id'])) {
         json_response(array('ok' => false, 'message' => 'No autenticado.'), 401);
     }
+
+    $timeoutSeconds = session_idle_timeout_seconds();
+    $lastActivity = isset($_SESSION['last_activity_at']) ? (int)$_SESSION['last_activity_at'] : 0;
+    if ($lastActivity > 0 && time() - $lastActivity > $timeoutSeconds) {
+        destroy_current_session();
+        json_response(array(
+            'ok' => false,
+            'message' => 'Tu sesión expiró por inactividad. Inicia sesión nuevamente.',
+            'code' => 'session_idle_timeout',
+        ), 401);
+    }
+
     if (function_exists('get_pdo')) {
         try {
             $pdo = get_pdo();
@@ -199,8 +237,7 @@ function require_session_user() {
             $stmt->execute(array((int)$_SESSION['user_id']));
             $current = $stmt->fetch();
             if (!$current || (isset($current['status']) ? $current['status'] : 'approved') !== 'approved') {
-                session_unset();
-                session_destroy();
+                destroy_current_session();
                 json_response(array('ok' => false, 'message' => 'Cuenta no aprobada.'), 403);
             }
             $_SESSION['user_role'] = $current['role'];
@@ -220,10 +257,11 @@ function require_session_user() {
     );
 
     if ($user['status'] !== 'approved') {
-        session_unset();
-        session_destroy();
+        destroy_current_session();
         json_response(array('ok' => false, 'message' => 'Cuenta no aprobada.'), 403);
     }
+
+    $_SESSION['last_activity_at'] = time();
 
     return $user;
 }
@@ -244,6 +282,8 @@ function set_session_user(array $user) {
     $_SESSION['user_name']  = $user['name'];
     $_SESSION['user_status'] = isset($user['status']) ? $user['status'] : 'approved';
     $_SESSION['csrf_token'] = random_hex(32);
+    $_SESSION['login_at'] = time();
+    $_SESSION['last_activity_at'] = time();
 }
 
 function get_json_body($maxBytes = 32768) {
